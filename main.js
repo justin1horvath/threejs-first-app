@@ -31,6 +31,80 @@ const light = new THREE.DirectionalLight(0xffffff, 1);
 light.position.set(5, 5, 5);
 scene.add(light);
 
+// Raycaster & helpers for picking the cube
+const raycaster = new THREE.Raycaster();
+const pointer = new THREE.Vector2();
+let isDragging = false;
+let activePointerId = null;
+const lastPointerPosition = { x: 0, y: 0 };
+let shakeStartTime = null;
+const SHAKE_DURATION = 250; // milliseconds
+const SHAKE_AMPLITUDE = 0.05; // world units
+const SHAKE_FREQUENCY = 20; // oscillations per second
+
+function setPointerFromEvent(event) {
+  pointer.x = (event.clientX / window.innerWidth) * 2 - 1;
+  pointer.y = -(event.clientY / window.innerHeight) * 2 + 1;
+}
+
+function onPointerDown(event) {
+  setPointerFromEvent(event);
+  raycaster.setFromCamera(pointer, camera);
+
+  const intersects = raycaster.intersectObject(cube, false);
+  if (intersects.length === 0) {
+    return;
+  }
+
+  isDragging = true;
+  activePointerId = event.pointerId;
+  lastPointerPosition.x = event.clientX;
+  lastPointerPosition.y = event.clientY;
+  shakeStartTime = performance.now();
+
+  canvas.setPointerCapture(event.pointerId);
+  event.preventDefault();
+}
+
+function onPointerMove(event) {
+  if (!isDragging || event.pointerId !== activePointerId) {
+    return;
+  }
+
+  const deltaX = event.clientX - lastPointerPosition.x;
+  const deltaY = event.clientY - lastPointerPosition.y;
+
+  const rotationSpeed = 0.005;
+  cube.rotation.y += deltaX * rotationSpeed;
+  cube.rotation.x += deltaY * rotationSpeed;
+
+  lastPointerPosition.x = event.clientX;
+  lastPointerPosition.y = event.clientY;
+}
+
+function endDrag(event) {
+  if (!isDragging || (event && event.pointerId !== activePointerId)) {
+    return;
+  }
+
+  if (activePointerId !== null) {
+    try {
+      canvas.releasePointerCapture(activePointerId);
+    } catch (error) {
+      // Ignore errors from releasing captures that are already released.
+    }
+  }
+
+  isDragging = false;
+  activePointerId = null;
+}
+
+canvas.addEventListener('pointerdown', onPointerDown);
+canvas.addEventListener('pointermove', onPointerMove);
+canvas.addEventListener('pointerup', endDrag);
+canvas.addEventListener('pointerleave', endDrag);
+canvas.addEventListener('pointercancel', endDrag);
+
 // Handle window resizing
 window.addEventListener('resize', () => {
   const width = window.innerWidth;
@@ -45,9 +119,21 @@ window.addEventListener('resize', () => {
 function animate() {
   requestAnimationFrame(animate);
 
-  // Rotate the cube a bit each frame
-  cube.rotation.x += 0.01;
-  cube.rotation.y += 0.01;
+  if (shakeStartTime !== null) {
+    const elapsed = performance.now() - shakeStartTime;
+
+    if (elapsed < SHAKE_DURATION) {
+      const decay = 1 - elapsed / SHAKE_DURATION;
+      const oscillation = Math.sin((elapsed / 1000) * Math.PI * 2 * SHAKE_FREQUENCY);
+      cube.position.x = oscillation * SHAKE_AMPLITUDE * decay;
+      cube.position.y = oscillation * (SHAKE_AMPLITUDE * 0.5) * decay;
+    } else {
+      cube.position.set(0, 0, 0);
+      shakeStartTime = null;
+    }
+  } else if (cube.position.x !== 0 || cube.position.y !== 0) {
+    cube.position.set(0, 0, 0);
+  }
 
   renderer.render(scene, camera);
 }
