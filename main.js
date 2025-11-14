@@ -19,17 +19,37 @@ camera.position.z = 3; // move camera back so we can see things
 // Create a WebGL renderer and attach it to our canvas
 const renderer = new THREE.WebGLRenderer({ canvas });
 renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
 // Create a simple box geometry and a basic material, then mesh them together
 const geometry = new THREE.BoxGeometry(1, 1, 1);
 const material = new THREE.MeshStandardMaterial({ color: 0x33b5a6 });
 const cube = new THREE.Mesh(geometry, material);
+cube.castShadow = true;
 scene.add(cube);
 
 // Add a light so we can see the cube’s faces
 const light = new THREE.DirectionalLight(0xffffff, 1);
 light.position.set(5, 5, 5);
+light.castShadow = true;
+light.shadow.mapSize.set(1024, 1024);
+light.shadow.camera.near = 0.1;
+light.shadow.camera.far = 20;
 scene.add(light);
+
+// Fill the scene with a subtle ambient light so shadows are not completely black
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+scene.add(ambientLight);
+
+// Ground plane to catch shadows
+const groundGeometry = new THREE.PlaneGeometry(10, 10);
+const groundMaterial = new THREE.MeshStandardMaterial({ color: 0xf0f0f0 });
+const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+ground.rotation.x = -Math.PI / 2;
+ground.position.y = -0.5;
+ground.receiveShadow = true;
+scene.add(ground);
 
 // Raycaster & helpers for picking the cube
 const raycaster = new THREE.Raycaster();
